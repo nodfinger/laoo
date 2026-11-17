@@ -358,7 +358,7 @@ public sealed class KnowledgeController(IConfiguration configuration, IWebHostEn
     [HttpGet("reviews")]
     public async Task<IActionResult> Reviews(CancellationToken token)
     {
-        if(!Scope(out var company,out var user)||!Project(out var project))return Forbid();await using var db=await Open(token);if(!await Can(db,"49004","VIEW",token))return Forbid();
+        if(!Scope(out var company,out var user)||!Project(out var project))return Forbid();await using var db=await Open(token);if(!await Can(db,"49003","EDIT",token)||!await Can(db,"49004","VIEW",token))return Forbid();
         return Ok(await Query(db,"SELECT a.ArticleID id,a.ArticleCode code,a.Title title,c.CategoryName categoryName,a.ContentType contentType,a.StatusCode status,r.RevisionNo revisionNo,r.IncludeInAi includeInAi,r.SubmittedAt,a.PublishedAt publishedAt,COALESCE((SELECT TOP(1) COALESCE(re.FullName,ru.Username) FROM dbo.TDADUser ru LEFT JOIN dbo.TDADUserEmployee rue ON rue.CompanyID=ru.CompanyID AND rue.UserID=ru.UserID AND rue.IsActive=1 LEFT JOIN dbo.TDADEmployee re ON re.CompanyID=rue.CompanyID AND re.EmployeeID=rue.EmployeeID WHERE ru.CompanyID=a.CompanyID AND ru.UserID=COALESCE(r.ReviewedBy,r.ReviewerUserID) ORDER BY rue.EmployeeID),N'-') reviewerName,CAST(CASE WHEN r.ReviewerUserID=@user AND EXISTS(SELECT 1 FROM dbo.TDKNContentReviewPolicy pol JOIN dbo.TDKNContentPolicyReviewer pr ON pr.CompanyID=pol.CompanyID AND pr.ContentType=pol.ContentType AND pr.ReviewerUserID=@user WHERE pol.CompanyID=a.CompanyID AND pol.ContentType=a.ContentType AND pol.ReviewerScope=N'ANY') THEN 1 ELSE 0 END AS bit) assignedReviewer,COALESCE(e.FullName,u.Username) ownerName FROM dbo.TDKNArticle a JOIN dbo.TDKNCategory c ON c.CategoryID=a.CategoryID AND c.CompanyID=a.CompanyID JOIN dbo.TDKNArticleRevision r ON r.RevisionID=a.CurrentRevisionID LEFT JOIN dbo.TDADUser u ON u.CompanyID=a.CompanyID AND u.UserID=a.OwnerUserID LEFT JOIN dbo.TDADUserEmployee ue ON ue.CompanyID=u.CompanyID AND ue.UserID=u.UserID AND ue.IsActive=1 LEFT JOIN dbo.TDADEmployee e ON e.CompanyID=ue.CompanyID AND e.EmployeeID=ue.EmployeeID WHERE a.CompanyID=@company AND ((a.StatusCode=N'IN_REVIEW'"+ReviewerCondition+") OR (r.ReviewedBy=@user AND r.ReviewedAt IS NOT NULL AND a.StatusCode IN(N'PUBLISHED',N'REVIEW_DUE',N'RETURNED'))) ORDER BY COALESCE(r.ReviewedAt,r.SubmittedAt) DESC",token,("@company",company),("@user",user),("@project",project)));
     }
 
@@ -366,7 +366,7 @@ public sealed class KnowledgeController(IConfiguration configuration, IWebHostEn
     public async Task<IActionResult> ReviewDetail(long id,CancellationToken token)
     {
         if(!Scope(out var company,out var user)||!Project(out var project))return Forbid();
-        await using var db=await Open(token);if(!await Can(db,"49004","VIEW",token))return Forbid();
+        await using var db=await Open(token);if(!await Can(db,"49003","EDIT",token)||!await Can(db,"49004","VIEW",token))return Forbid();
         var rows=await Query(db,@"SELECT a.ArticleID id,a.Title title,a.SummaryText summary,a.ContentType contentType,
  a.StatusCode status,a.SourceUrl sourceUrl,r.RevisionNo revisionNo,r.IncludeInAi includeInAi,r.BodyText bodyText
  FROM dbo.TDKNArticle a JOIN dbo.TDKNArticleRevision r ON r.CompanyID=a.CompanyID AND r.RevisionID=a.CurrentRevisionID
@@ -380,7 +380,7 @@ public sealed class KnowledgeController(IConfiguration configuration, IWebHostEn
     public async Task<IActionResult> ReviewImage(long id,long fileId,CancellationToken token)
     {
         if(!Scope(out var company,out var user)||!Project(out var project))return Forbid();await using var db=await Open(token);
-        if(!await Can(db,"49004","VIEW",token))return Forbid();
+        if(!await Can(db,"49003","EDIT",token)||!await Can(db,"49004","VIEW",token))return Forbid();
         var rows=await Query(db,@"SELECT f.RelativePath relativePath,f.StoredFileName storedFileName,f.OriginalFileName fileName,f.FileSizeBytes size
  FROM dbo.TDKNFile f JOIN dbo.TDKNArticle a ON a.CompanyID=f.CompanyID AND a.ArticleID=f.ArticleID AND a.CurrentRevisionID=f.RevisionID
  JOIN dbo.TDKNArticleRevision r ON r.CompanyID=a.CompanyID AND r.RevisionID=a.CurrentRevisionID
@@ -399,7 +399,7 @@ public sealed class KnowledgeController(IConfiguration configuration, IWebHostEn
     public Task<IActionResult> Return(long id,WorkflowRequest request,CancellationToken token)=>Review(id,"RETURN",request,token);
     async Task<IActionResult> Review(long id,string action,WorkflowRequest request,CancellationToken token)
     {
-        action=action.ToUpperInvariant();if(action is not ("PUBLISH" or "RETURN"))return NotFound();if(!Scope(out var company,out var user)||!Project(out var project))return Forbid();await using var db=await Open(token);if(!await Can(db,"49004","VIEW",token))return Forbid();var actionAllowed=await Can(db,"49004",action,token);if(action=="RETURN"&&Clean(request.Note) is null)return Bad("กรุณาระบุเหตุผล","การส่งกลับต้องมีเหตุผลเพื่อให้เจ้าของแก้ไขได้ถูกต้อง");
+        action=action.ToUpperInvariant();if(action is not ("PUBLISH" or "RETURN"))return NotFound();if(!Scope(out var company,out var user)||!Project(out var project))return Forbid();await using var db=await Open(token);if(!await Can(db,"49003","EDIT",token)||!await Can(db,"49004","VIEW",token))return Forbid();var actionAllowed=await Can(db,"49004",action,token);if(action=="RETURN"&&Clean(request.Note) is null)return Bad("กรุณาระบุเหตุผล","การส่งกลับต้องมีเหตุผลเพื่อให้เจ้าของแก้ไขได้ถูกต้อง");
         await using var tx=(SqlTransaction)await db.BeginTransactionAsync(IsolationLevel.Serializable,token);
         var eligible=await Scalar<int>(db,tx,"SELECT COUNT(*) FROM dbo.TDKNArticle a WITH(UPDLOCK,HOLDLOCK) JOIN dbo.TDKNArticleRevision r ON r.CompanyID=a.CompanyID AND r.RevisionID=a.CurrentRevisionID WHERE a.CompanyID=@company AND a.ArticleID=@id AND a.StatusCode=N'IN_REVIEW'"+ReviewerCondition,token,("@company",company),("@id",id),("@user",user),("@project",project));
         if(eligible==0){await tx.RollbackAsync(token);return Forbid();}
@@ -645,7 +645,8 @@ public sealed class KnowledgeController(IConfiguration configuration, IWebHostEn
         var claims=User.Claims.Where(c=>c.Type!="user_id").ToList();
         claims.Add(new Claim("user_id",reviewer.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         var principal=new ClaimsPrincipal(new ClaimsIdentity(claims,"KnowledgeReviewer"));
-        return await CompanyMenuAccess.IsAllowedAsync(db,principal,"49004","VIEW",token)
+        return await CompanyMenuAccess.IsAllowedAsync(db,principal,"49003","EDIT",token)
+            && await CompanyMenuAccess.IsAllowedAsync(db,principal,"49004","VIEW",token)
             && (await CompanyMenuAccess.IsAllowedAsync(db,principal,"49004","PUBLISH",token)
                 || await CompanyMenuAccess.IsAllowedAsync(db,principal,"49004","RETURN",token));
     }
