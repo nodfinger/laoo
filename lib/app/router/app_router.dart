@@ -185,6 +185,11 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.companyContacts,
       builder: (context, state) => const ContactPage(),
     ),
+    GoRoute(
+      path: RoutePaths.companySupplierContacts,
+      name: RouteNames.companySupplierContacts,
+      builder: (context, state) => const ContactPage(supplier: true),
+    ),
 
     ...buildProviderPublicRoutes(),
     ...buildSchoolPublicRoutes(),
@@ -233,8 +238,9 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.assetLocations,
       builder: (context, state) => const LocationPage(),
     ),
-    ...buildServiceFeatureRoutes(onCreateReceiptVendor: _createReceiptVendor)
-        .where((route) => route.path != RoutePaths.assetLocations),
+    ...buildServiceFeatureRoutes(
+      onCreateReceiptVendor: _createReceiptVendor,
+    ).where((route) => route.path != RoutePaths.assetLocations),
     ...buildVisitorFeatureRoutes(),
     ...buildTimeFeatureRoutes(),
     ...buildTrainingFeatureRoutes(),
@@ -553,8 +559,7 @@ final List<GoRoute> _placeholderRoutes = [
   GoRoute(
     path: '/company/my-system/sap-pms',
     name: 'mySystemSapPms',
-    builder: (context, state) =>
-        const SapPmsComparisonPage(),
+    builder: (context, state) => const SapPmsComparisonPage(),
   ),
   GoRoute(
     path: '/company/my-system/travel',

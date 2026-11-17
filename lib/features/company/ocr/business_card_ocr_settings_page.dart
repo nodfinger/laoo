@@ -3,10 +3,12 @@ import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
+import '../../../core/api/api_exception.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import 'business_card_ocr_api.dart';
 import 'business_card_ocr_ui.dart';
+import 'business_card_review_settings.dart';
 
 class BusinessCardOcrSettingsPage extends StatefulWidget {
   const BusinessCardOcrSettingsPage({super.key});
@@ -20,6 +22,7 @@ class _BusinessCardOcrSettingsPageState
   final _api = BusinessCardOcrApi(),
       _size = TextEditingController(),
       _timeout = TextEditingController();
+  final _reviewKey = GlobalKey<BusinessCardReviewSettingsState>();
   String _caption = '';
   bool _enabled = true,
       _engine = false,
@@ -92,17 +95,42 @@ class _BusinessCardOcrSettingsPageState
       );
       return;
     }
+    final review = _reviewKey.currentState;
+    final reviewError =
+        review?.validationError() ??
+        (review == null ? 'กรุณารอให้โหลดการตั้งค่าผู้ตรวจสอบสำเร็จ' : null);
+    if (reviewError != null) {
+      showTimedSnackBar(
+        context,
+        message: 'บันทึกการตั้งค่าไม่สำเร็จ\nรายละเอียดเพิ่มเติม: $reviewError',
+        error: true,
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
-      await _api.saveSettings(_enabled, size, timeout);
+      await _api.saveCombinedSettings(
+        _enabled,
+        size,
+        timeout,
+        review!.settings(),
+      );
       if (mounted) {
         showTimedSnackBar(context, message: 'บันทึกค่าระบบ OCR แล้ว');
       }
     } catch (error) {
       if (mounted) {
+        final message = error is ApiException
+            ? error.message
+            : 'บันทึกค่าระบบ OCR ไม่สำเร็จ';
+        final detail = error is ApiException
+            ? error.description
+            : 'กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่';
         showTimedSnackBar(
           context,
-          message: 'บันทึกค่าระบบ OCR ไม่สำเร็จ\nรายละเอียดเพิ่มเติม: $error',
+          message: detail == null
+              ? message
+              : '$message\nรายละเอียดเพิ่มเติม: $detail',
           error: true,
         );
       }
@@ -138,115 +166,131 @@ class _BusinessCardOcrSettingsPageState
                             Icons.document_scanner_outlined,
                             color: t.primaryColor,
                           ),
+                          trailing: _canEdit
+                              ? FilledButton.icon(
+                                  onPressed: _saving ? null : _save,
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: Size(100, t.buttonHeight),
+                                    backgroundColor: t.primaryColor,
+                                    foregroundColor: Colors.white,
+                                    textStyle: t.buttonStyle,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        t.radius,
+                                      ),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.save_outlined),
+                                  label: Text(
+                                    _saving ? 'กำลังบันทึก…' : 'บันทึก',
+                                  ),
+                                )
+                              : null,
                         ),
                         const SizedBox(height: LaooLayout.cardSpacing),
                         Expanded(
-                          child: LaooSurfaceCard(
-                            tokens: t,
-                            child: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    'ค่าการทำงานปัจจุบัน',
-                                    style: t.sectionStyle,
-                                  ),
-                                  const SizedBox(
-                                    height: LaooLayout.popupFieldSpacing,
-                                  ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                LaooSurfaceCard(
+                                  tokens: t,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
-                                      const Text('เปิดใช้งาน OCR นามบัตร'),
-                                      const SizedBox(width: 8),
-                                      Switch(
-                                        value: _enabled,
-                                        activeTrackColor: t.primaryColor,
-                                        onChanged: _canEdit && !_saving
-                                            ? (v) =>
-                                                  setState(() => _enabled = v)
-                                            : null,
+                                      Text(
+                                        'ค่าการทำงานปัจจุบัน',
+                                        style: t.sectionStyle,
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(
-                                    height: LaooLayout.popupFieldSpacing,
-                                  ),
-                                  TextField(
-                                    controller: _size,
-                                    style: t.inputStyle,
-                                    enabled: _canEdit && !_saving,
-                                    keyboardType: TextInputType.number,
-                                    decoration: ocrInput(
-                                      context,
-                                      'ขนาดภาพสูงสุด (MB)',
-                                    ),
-                                  ),
-                                  const SizedBox(
-                                    height: LaooLayout.popupFieldSpacing,
-                                  ),
-                                  TextField(
-                                    controller: _timeout,
-                                    style: t.inputStyle,
-                                    enabled: _canEdit && !_saving,
-                                    keyboardType: TextInputType.number,
-                                    decoration: ocrInput(
-                                      context,
-                                      'เวลาประมวลผลสูงสุด (วินาที)',
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        _engine
-                                            ? Icons.check_circle_outline
-                                            : Icons.error_outline,
-                                        color: _engine
-                                            ? t.primaryColor
-                                            : Theme.of(
-                                                context,
-                                              ).colorScheme.error,
+                                      const SizedBox(
+                                        height: LaooLayout.popupFieldSpacing,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          _engine
-                                              ? 'Tesseract ภาษาไทยและอังกฤษพร้อมใช้งาน'
-                                              : 'Tesseract หรือโมเดลภาษาไทย/อังกฤษยังไม่พร้อม',
-                                        ),
+                                      LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          Widget field(
+                                            TextEditingController controller,
+                                            String label,
+                                          ) => TextField(
+                                            controller: controller,
+                                            style: t.inputStyle,
+                                            enabled: _canEdit && !_saving,
+                                            keyboardType: TextInputType.number,
+                                            decoration: ocrInput(
+                                              context,
+                                              label,
+                                            ),
+                                          );
+                                          if (constraints.maxWidth > 600) {
+                                            return Row(
+                                              children: [
+                                                Expanded(
+                                                  child: field(
+                                                    _size,
+                                                    'ขนาดภาพสูงสุด (MB)',
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: field(
+                                                    _timeout,
+                                                    'เวลาประมวลผลสูงสุด (วินาที)',
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          }
+                                          return Column(
+                                            children: [
+                                              field(
+                                                _size,
+                                                'ขนาดภาพสูงสุด (MB)',
+                                              ),
+                                              const SizedBox(
+                                                height: LaooLayout
+                                                    .popupFieldSpacing,
+                                              ),
+                                              field(
+                                                _timeout,
+                                                'เวลาประมวลผลสูงสุด (วินาที)',
+                                              ),
+                                            ],
+                                          );
+                                        },
                                       ),
-                                    ],
-                                  ),
-                                  if (_canEdit) ...[
-                                    const SizedBox(height: 16),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: FilledButton.icon(
-                                        onPressed: _saving ? null : _save,
-                                        style: FilledButton.styleFrom(
-                                          minimumSize: Size(
-                                            100,
-                                            t.buttonHeight,
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            _engine
+                                                ? Icons.check_circle_outline
+                                                : Icons.error_outline,
+                                            color: _engine
+                                                ? t.primaryColor
+                                                : Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
                                           ),
-                                          backgroundColor: t.primaryColor,
-                                          foregroundColor: Colors.white,
-                                          textStyle: t.buttonStyle,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              t.radius,
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              _engine
+                                                  ? 'Tesseract ภาษาไทยและอังกฤษพร้อมใช้งาน'
+                                                  : 'Tesseract หรือโมเดลภาษาไทย/อังกฤษยังไม่พร้อม',
                                             ),
                                           ),
-                                        ),
-                                        icon: const Icon(Icons.save_outlined),
-                                        label: Text(
-                                          _saving ? 'กำลังบันทึก…' : 'บันทึก',
-                                        ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
-                                ],
-                              ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: LaooLayout.cardSpacing),
+                                BusinessCardReviewSettings(
+                                  key: _reviewKey,
+                                  canEdit: _canEdit,
+                                  saving: _saving,
+                                ),
+                              ],
                             ),
                           ),
                         ),

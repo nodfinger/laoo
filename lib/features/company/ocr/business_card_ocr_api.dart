@@ -19,6 +19,31 @@ class BusinessCardOcrApi {
   Future<Map<String, dynamic>> settings() async => Map<String, dynamic>.from(
     await _client.get('/api/company/ocr/business-cards/settings') as Map,
   );
+  Future<Map<String, dynamic>> reviewSettings() async =>
+      Map<String, dynamic>.from(
+        await _client.get('/api/company/ocr/business-cards/review-settings')
+            as Map,
+      );
+  Future<void> saveReviewSettings(Map<String, dynamic> settings) => _client.put(
+    '/api/company/ocr/business-cards/review-settings',
+    body: settings,
+  );
+  Future<void> saveCombinedSettings(
+    bool enabled,
+    int size,
+    int timeout,
+    Map<String, dynamic> review,
+  ) => _client.put(
+    '/api/company/ocr/business-cards/review-settings/combined',
+    body: {
+      'ocr': {
+        'isEnabled': enabled,
+        'maxImageSizeMB': size,
+        'timeoutSeconds': timeout,
+      },
+      'review': review,
+    },
+  );
   Future<void> saveSettings(bool enabled, int size, int timeout) => _client.put(
     '/api/company/ocr/business-cards/settings',
     body: {

@@ -155,6 +155,13 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.companyContacts,
       scope: AppMenuScope.company,
     ),
+    '55003': AppMenuRouteSpec(
+      menuCode: '55003',
+      databaseRouteName: 'companySupplierContacts',
+      goRouteName: RouteNames.companySupplierContacts,
+      path: RoutePaths.companySupplierContacts,
+      scope: AppMenuScope.company,
+    ),
     '13002': AppMenuRouteSpec(
       menuCode: '13002',
       databaseRouteName: 'companyPersons',
