@@ -39,6 +39,8 @@ class ContactApi {
 
   Future<void> sendDraft(int id) async =>
       _client.post('$_base/ocr-drafts/$id/send', body: <String, dynamic>{});
+  Future<void> updateDraft(int id, Map<String, dynamic> contact) async =>
+      _client.put('$_base/ocr-drafts/$id', body: {'contact': contact});
   Future<void> deleteDraft(int id) async =>
       _client.delete('$_base/ocr-drafts/$id');
   Future<Map<String, dynamic>> draftDetails(int id) async =>
@@ -54,7 +56,7 @@ class ContactApi {
     int pageSize = 20,
   }) async => Map<String, dynamic>.from(
     await _client.get(
-          '$_base',
+          _base,
           query: {
             'search': search,
             'page': page.toString(),
@@ -83,7 +85,7 @@ class ContactApi {
     int? id,
   }) async => Map<String, dynamic>.from(
     (id == null
-            ? await _client.post('$_base', body: body)
+            ? await _client.post(_base, body: body)
             : await _client.put('$_base/$id', body: body))
         as Map,
   );
