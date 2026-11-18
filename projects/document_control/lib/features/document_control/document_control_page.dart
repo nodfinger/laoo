@@ -34,6 +34,8 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
   late final JsonApiClient api = createDocumentControlApiClient();
   late Future<Map<String, dynamic>> future;
   final search = TextEditingController();
+  final _searchFieldKey = GlobalKey();
+  double _searchHeight = 48;
   String title = '';
   int page = 1;
   bool typeCards = false;
@@ -188,41 +190,69 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
           Expanded(child: body),
         ],
       );
-  Widget _search() => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: [
-      SizedBox(
-        width: 320,
-        child: TextField(
-          controller: search,
-          decoration: _input(
-            widget.mode == DocumentControlPageMode.types
-                ? 'ค้นหาชื่อประเภทเอกสาร'
-                : 'ค้นหาเลขที่หรือชื่อเอกสาร',
-            Icons.search,
+  Widget _search() {
+    final sync =
+        widget.mode == DocumentControlPageMode.types ||
+        widget.mode == DocumentControlPageMode.controlled;
+    if (sync) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final box = _searchFieldKey.currentContext?.findRenderObject();
+        if (mounted &&
+            box is RenderBox &&
+            box.hasSize &&
+            _searchHeight != box.size.height) {
+          setState(() => _searchHeight = box.size.height);
+        }
+      });
+    }
+    final buttonStyle = sync
+        ? ButtonStyle(
+            minimumSize: WidgetStatePropertyAll(Size(0, _searchHeight)),
+            maximumSize: WidgetStatePropertyAll(
+              Size(double.infinity, _searchHeight),
+            ),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          )
+        : null;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        SizedBox(
+          width: 320,
+          child: TextField(
+            key: sync ? _searchFieldKey : null,
+            controller: search,
+            decoration: _input(
+              widget.mode == DocumentControlPageMode.types
+                  ? 'ค้นหาชื่อประเภทเอกสาร'
+                  : 'ค้นหาเลขที่หรือชื่อเอกสาร',
+              Icons.search,
+            ),
           ),
         ),
-      ),
-      FilledButton.icon(
-        onPressed: () {
-          page = 1;
-          reload();
-        },
-        icon: const Icon(Icons.search),
-        label: const Text('ค้นหา'),
-      ),
-      OutlinedButton.icon(
-        onPressed: () {
-          search.clear();
-          page = 1;
-          reload();
-        },
-        icon: const Icon(Icons.filter_alt_off_outlined),
-        label: const Text('ล้าง Filter'),
-      ),
-    ],
-  );
+        FilledButton.icon(
+          style: buttonStyle,
+          onPressed: () {
+            page = 1;
+            reload();
+          },
+          icon: const Icon(Icons.search),
+          label: const Text('ค้นหา'),
+        ),
+        OutlinedButton.icon(
+          style: buttonStyle,
+          onPressed: () {
+            search.clear();
+            page = 1;
+            reload();
+          },
+          icon: const Icon(Icons.filter_alt_off_outlined),
+          label: const Text('ล้าง Filter'),
+        ),
+      ],
+    );
+  }
 
   Widget _settings(Map<String, dynamic> data, Map<String, dynamic> actions) {
     final p = TextEditingController(text: _text(data['maxPrimaryFileMb'])),
@@ -685,7 +715,9 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
               'Rev. ' +
                   _text(row['revisionNo']) +
                   ' · ' +
-                  _text(row['typeName'] ?? row['taskType'] ?? row['status']),
+                  _statusName(
+                    _text(row['typeName'] ?? row['taskType'] ?? row['status']),
+                  ),
             ),
             trailing: actions(row),
           );
@@ -731,14 +763,32 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
         onPressed: () => _viewDocument(row),
         icon: const Icon(Icons.visibility_outlined),
       ),
-      if (actions['edit'] == true &&
-          (general || {'DRAFT', 'RETURNED'}.contains(_text(row['status']))))
+      if (row['canManage'] == true &&
+          actions['edit'] == true &&
+          {'DRAFT', 'RETURNED'}.contains(_text(row['status'])))
         IconButton(
           tooltip: 'แก้ไข',
           onPressed: () => _editDocument(row, options, general),
           icon: const Icon(Icons.edit_outlined),
         ),
+      if (row['canManage'] == true &&
+          actions['edit'] == true &&
+          {'EFFECTIVE', 'PUBLISHED'}.contains(_text(row['status'])))
+        IconButton(
+          tooltip: 'สร้างร่าง Revision ใหม่',
+          onPressed: () => _revisionDraftDialog(row),
+          icon: const Icon(Icons.post_add_outlined),
+        ),
+      if (row['canManage'] == true &&
+          actions['edit'] == true &&
+          {'EFFECTIVE', 'PUBLISHED'}.contains(_text(row['status'])))
+        IconButton(
+          tooltip: 'คำขอยกเลิกเอกสาร',
+          onPressed: () => _withdrawalDraftDialog(row),
+          icon: const Icon(Icons.assignment_return_outlined),
+        ),
       if (!general &&
+          row['canManage'] == true &&
           actions['submit'] == true &&
           {'DRAFT', 'RETURNED'}.contains(_text(row['status'])))
         IconButton(
@@ -746,8 +796,9 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
           onPressed: () => _submit(row),
           icon: const Icon(Icons.send_outlined),
         ),
-      if (actions['delete'] == true &&
-          (general || _text(row['status']) == 'DRAFT'))
+      if (row['canManage'] == true &&
+          actions['delete'] == true &&
+          _text(row['status']) == 'DRAFT')
         IconButton(
           tooltip: 'ลบ',
           onPressed: () => _deleteDocument(row),
@@ -986,6 +1037,42 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
           typeLayout: true,
           content: Column(
             children: [
+              Wrap(
+                spacing: 24,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'กำหนดให้รับทราบ',
+                        style: documentControlUiTokens.inputStyle,
+                      ),
+                      const SizedBox(width: 8),
+                      Switch(
+                        value: ack,
+                        onChanged: (v) => setLocal(() => ack = v),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'สถานะใช้งาน',
+                        style: documentControlUiTokens.inputStyle,
+                      ),
+                      const SizedBox(width: 8),
+                      Switch(
+                        value: active,
+                        onChanged: (v) => setLocal(() => active = v),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               _field(name, 'ชื่อประเภท *'),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
@@ -1031,18 +1118,6 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                   ),
                 ],
                 onChanged: (v) => setLocal(() => audience = v!),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('กำหนดให้รับทราบ'),
-                value: ack,
-                onChanged: (v) => setLocal(() => ack = v),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('สถานะใช้งาน'),
-                value: active,
-                onChanged: (v) => setLocal(() => active = v),
               ),
             ],
           ),
@@ -1107,7 +1182,12 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
               ? '00'
               : _text(row?['revisionNo']),
         ),
-        summary = TextEditingController(text: _text(row?['changeSummary']));
+        summary = TextEditingController(text: _text(row?['changeSummary'])),
+        reason = TextEditingController(text: _text(row?['changeReason'])),
+        impact = TextEditingController(text: _text(row?['impactAssessment'])),
+        reference = TextEditingController(
+          text: _text(row?['referenceDocumentNo']),
+        );
     final types = _rows(options['types'])
         .where(
           (x) =>
@@ -1126,7 +1206,8 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
         ack = row?['requireAcknowledgement'] == true,
         download = false;
     int? reviewer = (row?['reviewerUserId'] as num?)?.toInt(),
-        approver = (row?['approverUserId'] as num?)?.toInt();
+        approver = (row?['approverUserId'] as num?)?.toInt(),
+        ownerDepartment = (row?['ownerDepartmentId'] as num?)?.toInt();
     final selectedDepartments = <int>{}, selectedUsers = <int>{};
     for (final access in _rows(row?['access'])) {
       if (access['subjectType'] == 'DEPARTMENT' && access['subjectId'] is num)
@@ -1146,9 +1227,11 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
               ' > ' +
               (row == null ? 'เพิ่ม' : 'แก้ไข'),
           icon: Icons.description_outlined,
+          documentLayout: !general,
           content: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (!general) const SizedBox(height: 12),
               _field(no, 'เลขที่เอกสาร *'),
               const SizedBox(height: 16),
               _field(name, 'ชื่อเอกสาร *'),
@@ -1183,9 +1266,40 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                 }),
               ),
               const SizedBox(height: 16),
+              DropdownButtonFormField<int>(
+                initialValue: ownerDepartment,
+                decoration: _input('แผนกเจ้าของเอกสาร'),
+                items: departments
+                    .map(
+                      (x) => DropdownMenuItem<int>(
+                        value: (x['id'] as num).toInt(),
+                        child: Text(
+                          _text(x['name']),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setLocal(() => ownerDepartment = v),
+              ),
+              const SizedBox(height: 16),
               _field(revision, 'Revision *'),
               const SizedBox(height: 16),
-              _field(summary, 'รายละเอียดการเปลี่ยนแปลง', maxLines: 3),
+              _field(
+                summary,
+                'รายละเอียดการเปลี่ยนแปลง',
+                maxLines: general ? 3 : 2,
+              ),
+              const SizedBox(height: 16),
+              _field(reason, 'เหตุผล', maxLines: general ? 3 : 2),
+              const SizedBox(height: 16),
+              _field(
+                impact,
+                'ผลกระทบต่อเอกสาร ระบบ และงานที่เกี่ยวข้อง',
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              _field(reference, 'เลขที่เอกสารอ้างอิง (คั่นด้วย ,)'),
               const SizedBox(height: 16),
               if (!general) ...[
                 DropdownButtonFormField<int>(
@@ -1266,7 +1380,8 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                 value: ack,
                 onChanged: (v) => setLocal(() => ack = v),
               ),
-              if (row == null)
+              if (row == null ||
+                  {'DRAFT', 'RETURNED'}.contains(_text(row['status'])))
                 OutlinedButton.icon(
                   onPressed: () async {
                     final picked = await FilePicker.platform.pickFiles(
@@ -1310,9 +1425,12 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
               'documentNo': no.text,
               'title': name.text,
               'documentClass': general ? 'GENERAL' : 'CONTROLLED',
-              'ownerDepartmentId': null,
+              'ownerDepartmentId': ownerDepartment,
               'revisionNo': revision.text,
               'changeSummary': summary.text,
+              'changeReason': reason.text,
+              'impactAssessment': impact.text,
+              'referenceDocumentNo': reference.text,
               'effectiveDate': null,
               'reviewerUserId': reviewer,
               'approverUserId': approver,
@@ -1321,7 +1439,7 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
               'userIds': selectedUsers.toList(),
               'allowDownload': download,
               'requireAcknowledgement': ack,
-              'publishDate': general ? DateTime.now().toIso8601String() : null,
+              'publishDate': row?['publishDate'],
               'expireDate': null,
             };
             final result = row == null
@@ -1338,15 +1456,30 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                       body: body,
                     ),
                   );
-            if (primary != null && primary!.bytes != null)
-              await uploadDocumentControlFile(
-                '/api/company/document-control/documents/' +
-                    _text(result['id']) +
-                    '/files',
-                fileName: primary!.name,
-                bytes: primary!.bytes!,
-                fields: {'fileRole': 'PRIMARY'},
-              );
+            if (primary != null && primary!.bytes != null) {
+              try {
+                await uploadDocumentControlFile(
+                  '/api/company/document-control/documents/' +
+                      _text(result['id']) +
+                      '/files',
+                  fileName: primary!.name,
+                  bytes: primary!.bytes!,
+                  fields: {'fileRole': 'PRIMARY'},
+                );
+              } catch (_) {
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                if (mounted) {
+                  showDocumentControlMessage(
+                    context,
+                    message:
+                        'บันทึกแบบร่างแล้ว แต่แนบไฟล์ไม่สำเร็จ กรุณาแก้ไขรายการเพื่อแนบไฟล์อีกครั้ง',
+                    error: true,
+                  );
+                  reload();
+                }
+                return;
+              }
+            }
             if (dialogContext.mounted) Navigator.pop(dialogContext);
             if (mounted)
               showDocumentControlMessage(context, message: 'บันทึกเอกสารแล้ว');
@@ -1379,7 +1512,7 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
             _info('ชื่อเอกสาร', h['title']),
             _info('ประเภท', _className(h['documentClass'])),
             _info('Revision', h['revisionNo']),
-            _info('สถานะ', h['status']),
+            _info('สถานะ', _statusName(_text(h['status']))),
             _info('รายละเอียดการเปลี่ยนแปลง', h['changeSummary']),
             const SizedBox(height: 12),
             Text('ไฟล์เอกสาร', style: documentControlUiTokens.sectionStyle),
@@ -1444,9 +1577,25 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.history),
                 title: Text(
-                  'Rev. ' + _text(r['revisionNo']) + ' · ' + _text(r['status']),
+                  'Rev. ' +
+                      _text(r['revisionNo']) +
+                      ' · ' +
+                      _statusName(_text(r['status'])),
                 ),
                 subtitle: Text(_text(r['changeSummary'])),
+                trailing:
+                    row['canManage'] == true &&
+                        _text(r['status']) == 'DRAFT' &&
+                        r['basedOnRevisionId'] != null
+                    ? IconButton(
+                        tooltip: 'แก้ไขร่าง Revision',
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          _revisionDraftDialog(row, revision: r);
+                        },
+                      )
+                    : null,
               ),
             ),
           ],
@@ -1457,6 +1606,251 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
         cancelVisible: false,
       ),
     );
+  }
+
+  Future<void> _revisionDraftDialog(
+    Map<String, dynamic> row, {
+    Map<String, dynamic>? revision,
+  }) async {
+    final revisionNo = TextEditingController(
+      text: _text(revision?['revisionNo']),
+    );
+    final summary = TextEditingController(
+      text: _text(revision?['changeSummary']),
+    );
+    final reason = TextEditingController(
+      text: _text(revision?['changeReason']),
+    );
+    final impact = TextEditingController(
+      text: _text(revision?['impactAssessment']),
+    );
+    final reference = TextEditingController(
+      text: _text(revision?['referenceDocumentNo']),
+    );
+    PlatformFile? primary;
+    String? savedRevisionId = revision == null ? null : _text(revision['id']);
+    var saving = false;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setLocal) => _popup(
+          caption: revision == null
+              ? 'สร้างร่าง Revision ใหม่'
+              : 'แก้ไขร่าง Revision',
+          icon: Icons.post_add_outlined,
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _text(row['title']),
+                style: documentControlUiTokens.sectionStyle,
+              ),
+              const SizedBox(height: 16),
+              _field(revisionNo, 'Revision *'),
+              const SizedBox(height: 16),
+              _field(summary, 'รายละเอียดการเปลี่ยนแปลง *', maxLines: 3),
+              const SizedBox(height: 16),
+              _field(reason, 'เหตุผลการเปลี่ยนแปลง *', maxLines: 3),
+              const SizedBox(height: 16),
+              _field(
+                impact,
+                'ผลกระทบต่อเอกสาร ระบบ และงานที่เกี่ยวข้อง',
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              _field(reference, 'เลขที่เอกสารอ้างอิง (คั่นด้วย ,)'),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final picked = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: const ['pdf'],
+                          withData: true,
+                        );
+                        if (picked != null && context.mounted)
+                          setLocal(() => primary = picked.files.single);
+                      },
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: Text(primary?.name ?? 'เลือกไฟล์หลัก PDF'),
+              ),
+            ],
+          ),
+          onSave: () async {
+            if (saving) return;
+            if (revisionNo.text.trim().isEmpty ||
+                summary.text.trim().isEmpty ||
+                reason.text.trim().isEmpty) {
+              showDocumentControlMessage(
+                context,
+                message: 'กรุณาระบุ Revision รายละเอียดและเหตุผลการเปลี่ยนแปลง',
+                error: true,
+              );
+              return;
+            }
+            if (primary != null && primary!.bytes == null) {
+              showDocumentControlMessage(
+                context,
+                message: 'อ่านไฟล์ไม่ได้ กรุณาเลือกไฟล์อีกครั้ง',
+                error: true,
+              );
+              return;
+            }
+            final path =
+                '/api/company/document-control/documents/${_text(row['id'])}/draft-revisions';
+            final body = {
+              'revisionNo': revisionNo.text.trim(),
+              'changeSummary': summary.text.trim(),
+              'changeReason': reason.text.trim(),
+              'impactAssessment': impact.text.trim(),
+              'referenceDocumentNo': reference.text.trim(),
+            };
+            setLocal(() => saving = true);
+            try {
+              if (savedRevisionId == null) {
+                final result = _map(await api.post(path, body: body));
+                savedRevisionId = _text(result['id']);
+                if (savedRevisionId!.isEmpty)
+                  throw StateError('Missing revision id');
+              } else {
+                await api.put('$path/$savedRevisionId', body: body);
+              }
+              if (primary != null && primary!.bytes != null) {
+                try {
+                  await uploadDocumentControlFile(
+                    '/api/company/document-control/documents/${_text(row['id'])}/files',
+                    fileName: primary!.name,
+                    bytes: primary!.bytes!,
+                    fields: {
+                      'fileRole': 'PRIMARY',
+                      'revisionId': savedRevisionId!,
+                    },
+                  );
+                } catch (_) {
+                  if (mounted)
+                    showDocumentControlMessage(
+                      context,
+                      message:
+                          'บันทึกร่างแล้ว แต่แนบไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง',
+                      error: true,
+                    );
+                  return;
+                }
+              }
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              if (mounted) {
+                showDocumentControlMessage(
+                  context,
+                  message: 'บันทึกร่าง Revision แล้ว',
+                );
+                reload();
+              }
+            } catch (_) {
+              if (mounted)
+                showDocumentControlMessage(
+                  context,
+                  message:
+                      'บันทึกร่าง Revision ไม่สำเร็จ กรุณาตรวจ Revision และฉบับต้นทาง',
+                  error: true,
+                );
+            } finally {
+              if (dialogContext.mounted) setLocal(() => saving = false);
+            }
+          },
+        ),
+      ),
+    );
+    revisionNo.dispose();
+    summary.dispose();
+    reason.dispose();
+    impact.dispose();
+    reference.dispose();
+  }
+
+  Future<void> _withdrawalDraftDialog(Map<String, dynamic> row) async {
+    final path =
+        '/api/company/document-control/documents/${_text(row['id'])}/withdrawal-request';
+    Map<String, dynamic> existing;
+    try {
+      existing = _map(await api.get(path));
+    } catch (_) {
+      if (mounted)
+        showDocumentControlMessage(
+          context,
+          message: 'โหลดคำขอยกเลิกไม่สำเร็จ',
+          error: true,
+        );
+      return;
+    }
+    if (!mounted) return;
+    final reason = TextEditingController(text: _text(existing['reason']));
+    final impact = TextEditingController(
+      text: _text(existing['impactAssessment']),
+    );
+    var saving = false;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => _popup(
+        caption: 'แบบร่างคำขอยกเลิกเอกสาร',
+        icon: Icons.assignment_return_outlined,
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _text(row['title']),
+              style: documentControlUiTokens.sectionStyle,
+            ),
+            const SizedBox(height: 16),
+            _field(reason, 'เหตุผลที่ขอยกเลิก *', maxLines: 3),
+            const SizedBox(height: 16),
+            _field(impact, 'ผลกระทบ', maxLines: 3),
+            const SizedBox(height: 12),
+            const Text('บันทึกเป็นแบบร่าง เอกสารฉบับปัจจุบันยังใช้งานได้'),
+          ],
+        ),
+        onSave: () async {
+          if (saving) return;
+          if (reason.text.trim().isEmpty) {
+            showDocumentControlMessage(
+              context,
+              message: 'กรุณาระบุเหตุผลที่ขอยกเลิก',
+              error: true,
+            );
+            return;
+          }
+          saving = true;
+          try {
+            await api.post(
+              path,
+              body: {
+                'reason': reason.text.trim(),
+                'impactAssessment': impact.text.trim(),
+              },
+            );
+            if (dialogContext.mounted) Navigator.pop(dialogContext);
+            if (mounted)
+              showDocumentControlMessage(
+                context,
+                message: 'บันทึกร่างคำขอยกเลิกแล้ว',
+              );
+          } catch (_) {
+            if (mounted)
+              showDocumentControlMessage(
+                context,
+                message: 'บันทึกคำขอยกเลิกไม่สำเร็จ',
+                error: true,
+              );
+          } finally {
+            saving = false;
+          }
+        },
+      ),
+    );
+    reason.dispose();
+    impact.dispose();
   }
 
   Future<void> _submit(Map<String, dynamic> row) async {
@@ -1615,13 +2009,14 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
     String saveText = 'บันทึก',
     bool cancelVisible = true,
     bool typeLayout = false,
+    bool documentLayout = false,
   }) => Dialog(
     backgroundColor: Colors.white,
     insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     child: ConstrainedBox(
       constraints: BoxConstraints(
-        maxWidth: typeLayout ? 600 : 480,
+        maxWidth: documentLayout ? 900 : (typeLayout ? 600 : 480),
         maxHeight: 760,
       ),
       child: Column(
@@ -1675,7 +2070,7 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                 if (cancelVisible)
                   SizedBox(
                     height: 48,
-                    width: typeLayout ? 112 : 84,
+                    width: typeLayout || documentLayout ? 112 : 84,
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
                         foregroundColor: typeLayout
@@ -1778,6 +2173,11 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
     labelStyle: documentControlUiTokens.inputStyle,
     floatingLabelStyle: documentControlUiTokens.inputStyle.copyWith(
       color: documentControlUiTokens.primaryColor,
+      fontSize:
+          widget.mode == DocumentControlPageMode.types ||
+              widget.mode == DocumentControlPageMode.controlled
+          ? 20
+          : null,
     ),
     prefixIcon: icon == null ? null : Icon(icon),
     filled: false,
