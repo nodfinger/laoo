@@ -50,7 +50,7 @@ public sealed class MeetingFoodDistributionController(IConfiguration configurati
         await using var db = await Open(token);
         if (!await CanAccess(db, company, user, "VIEW", null, token)) return Forbid();
         if (!await Ready(db, token)) return Ok(new { available = false, total = 0, page, pageSize, items = Array.Empty<object>() });
-        var rowsSql = RowsCte() + RowsWhere();
+        var rowsSql = RowsCte() + "\n" + RowsWhere();
         await using var count = new SqlCommand($"""
 WITH Rows AS ({rowsSql})
 SELECT COUNT_BIG(1) FROM Rows;
@@ -215,7 +215,7 @@ LEFT JOIN dbo.TDADMeetingParticipantCheckIn C ON C.CompanyID=B.CompanyID AND C.B
  WHERE B.CompanyID=@company AND P.InvitationStatus='ACCEPTED'
  AND S.StartDateTime<DATEADD(day,1,CAST(@to AS datetime2)) AND S.EndDateTime>=CAST(@from AS datetime2)
  """;
-        where += " AND " + OwnershipSql + """
+        where += " AND " + OwnershipSql + "\n" + """
  AND (@search IS NULL OR B.BookingNo LIKE N'%'+@search+N'%' OR B.Subject LIKE N'%'+@search+N'%'
       OR E.EmployeeCode LIKE N'%'+@search+N'%' OR E.FullName LIKE N'%'+@search+N'%' OR E.NickName LIKE N'%'+@search+N'%')
 GROUP BY B.BookingID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,P.BookingParticipantID,

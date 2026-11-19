@@ -30,10 +30,12 @@ SELECT
  JSON_QUERY((SELECT I.ItemID itemId,I.ItemCode code,I.ItemName nameTh,I.UnitCode unitCode,
                     I.ItemTypeCode itemTypeCode,COALESCE(T.Name,I.ItemTypeCode) itemTypeName
  FROM dbo.TDIVItem I
- INNER JOIN dbo.TDIVItemUsage IU ON IU.CompanyID=I.CompanyID
-     AND IU.ItemID=I.ItemID AND IU.UsageCode=N'EQUIPMENT'
  LEFT JOIN dbo.TDSTMaster T ON T.MasterGroupCode=N'007' AND T.MasterCode=I.ItemTypeCode
  WHERE I.CompanyID=@company AND I.IsActive=1 AND @rooms=1
+   AND EXISTS
+       (SELECT 1 FROM dbo.TDIVItemUsage IU
+        WHERE IU.CompanyID=I.CompanyID AND IU.ItemID=I.ItemID
+          AND IU.UsageCode=N'EQUIPMENT')
    AND (NOT EXISTS
         (SELECT 1 FROM dbo.TDIVItemProjectPolicy IP
          WHERE IP.CompanyID=I.CompanyID AND IP.ItemID=I.ItemID

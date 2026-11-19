@@ -26,6 +26,7 @@ class _State extends State<MeetingFoodDistributionPage> {
   String? message, status;
   List<Map<String, dynamic>> items = [];
   bool loading = true, available = true;
+  bool messageError = false;
   int page = 1, total = 0;
 
   @override
@@ -71,9 +72,10 @@ class _State extends State<MeetingFoodDistributionPage> {
       });
     } catch (error) {
       if (mounted) {
-        setState(
-          () => message = errorText(error, 'โหลดรายการแจกอาหารไม่สำเร็จ'),
-        );
+        setState(() {
+          messageError = true;
+          message = errorText(error, 'โหลดรายการแจกอาหารไม่สำเร็จ');
+        });
       }
     } finally {
       if (mounted) setState(() => loading = false);
@@ -134,7 +136,10 @@ class _State extends State<MeetingFoodDistributionPage> {
             );
             if (mounted) {
               Navigator.pop(context);
-              setState(() => message = 'บันทึกการแจกอาหารแล้ว');
+              setState(() {
+                messageError = false;
+                message = 'บันทึกการแจกอาหารแล้ว';
+              });
               load();
             }
           },
@@ -142,10 +147,10 @@ class _State extends State<MeetingFoodDistributionPage> {
       );
     } catch (error) {
       if (mounted) {
-        setState(
-          () =>
-              message = errorText(error, 'โหลดรายละเอียดการแจกอาหารไม่สำเร็จ'),
-        );
+        setState(() {
+          messageError = true;
+          message = errorText(error, 'โหลดรายละเอียดการแจกอาหารไม่สำเร็จ');
+        });
       }
     }
   }
@@ -348,9 +353,7 @@ class _State extends State<MeetingFoodDistributionPage> {
               right: 12,
               child: AutoDismissMessage(
                 message: message!,
-                error:
-                    message!.contains('ไม่สำเร็จ') ||
-                    message!.contains('ไม่มีสิทธิ์'),
+                error: messageError,
                 onClose: () => setState(() => message = null),
               ),
             ),

@@ -4,7 +4,8 @@ class MeetingRoomRepository {
   MeetingRoomRepository({ApiClient? api}) : _api = api ?? ApiClient();
   final ApiClient _api;
   static const _path = '/api/company/meeting-rooms';
-  Future<List<Map<String, dynamic>>> get() async => List<Map<String, dynamic>>.from(await _api.get(_path) as List);
+  Future<List<Map<String, dynamic>>> get() async =>
+      List<Map<String, dynamic>>.from(await _api.get(_path) as List? ?? const []);
   Future<Map<String, bool>> actions() async => Map<String, bool>.fromEntries((await _api.get('$_path/actions') as Map).entries.map((e) => MapEntry('${e.key}', e.value == true)));
   Future<int> save(Map<String, dynamic> body, {int? id}) async => ((await (id == null ? _api.post(_path, body: body) : _api.put('$_path/$id', body: body))) as Map)['roomId'] as int;
   Future<void> delete(int id) => _api.delete('$_path/$id');

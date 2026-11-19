@@ -20,6 +20,15 @@ public sealed class MeetingRoomBookingController(IConfiguration configuration) :
     private const string TrainingInstructorScreenCode = "37002";
     private HashSet<long>? _adminRooms;
 
+    private async Task<bool> EvaluationEnabled(SqlConnection db, CancellationToken token)
+    {
+        if (!TryCompany(out var company) || !long.TryParse(User.FindFirstValue("partner_id"), out var partner)) return false;
+        const string sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP JOIN dbo.TDADProject P ON P.ProjectID=CP.ProjectID AND P.ProjectCode=N'LAOO_EVALUATION' AND P.IsActive=1 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=CP.CompanyID AND C.PartnerID=CP.PartnerID AND C.IsActive=1 WHERE CP.CompanyID=@company AND CP.PartnerID=@partner AND CP.IsEnabled=1 AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END";
+        await using var command = new SqlCommand(sql, db);
+        Add(command, "@company", company); Add(command, "@partner", partner);
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
+
     private async Task<HashSet<long>> AdminRooms(SqlConnection db, CancellationToken token) =>
         _adminRooms ??= await MeetingRoomAdminAccess.Rooms(db, User, token);
 
@@ -86,6 +95,7 @@ public sealed class MeetingRoomBookingController(IConfiguration configuration) :
             approvalView = await Allowed(connection, "VIEW", token, ApprovalScreenCode),
             approvalEdit = await Allowed(connection, "EDIT", token, ApprovalScreenCode),
             admin = isAdmin,
+            evaluationEnabled = await EvaluationEnabled(connection, token),
             adminRoomIds = await AdminRooms(connection, token),
         });
     }
@@ -552,7 +562,7 @@ ORDER BY R.RoomCode;
         string? status,
         CancellationToken token = default)
     {
-        if (!TryCompany(out var companyId)) return Forbid();
+        if (!TryCompany(out var companyId) || !TryUser(out var userId)) return Forbid();
         var start = (from ?? DateTime.Today).Date;
         var finish = (to ?? start.AddDays(7)).Date.AddDays(1);
         if (finish <= start || (finish - start).TotalDays > 62)
@@ -568,11 +578,18 @@ ORDER BY R.RoomCode;
         var calendarAdmins = await AdminRooms(connection, token);
         if (!calendarAll && calendarAdmins.Count == 0) return Forbid();
         const string sql = """
-SELECT S.BookingSlotID,B.BookingID,B.BookingNo,B.Subject,B.Description,B.AttendeeCount,
+SELECT S.BookingSlotID,B.BookingID,B.BookingNo,
+       CASE WHEN ISNULL(V.PrivateSubject,0)=0 OR B.RequesterUserID=@user OR CHARINDEX(','+CONVERT(varchar(20),B.RoomID)+',',@calendarAdmins)>0 THEN B.Subject ELSE NULL END,
+       B.Description,B.AttendeeCount,
        B.BookingStatus,B.ApprovalMode,S.BookingDate,S.StartDateTime,S.EndDateTime,
        R.RoomID,R.RoomCode,R.RoomNameTH,R.Capacity,
        BR.BranchID,BR.BranchNameTH,BD.BuildingID,BD.BuildingNameTH,F.FloorID,F.FloorNameTH,
-       E.EmployeeCode,NULLIF(E.FullName,'')
+       E.EmployeeCode,
+       CASE COALESCE(CS.EmployeeNameDisplay,'FULL')
+         WHEN 'NICK' THEN COALESCE(NULLIF(LTRIM(RTRIM(E.NickName)),''),NULLIF(E.FullName,''))
+         WHEN 'BOTH' THEN CASE WHEN NULLIF(LTRIM(RTRIM(E.NickName)),'') IS NULL THEN NULLIF(E.FullName,'') ELSE CONCAT(E.FullName,N' (',LTRIM(RTRIM(E.NickName)),N')') END
+         ELSE NULLIF(E.FullName,'') END,
+       D.NameTH
 FROM dbo.TDADMeetingRoomBookingSlot S
 INNER JOIN dbo.TDADMeetingRoomBooking B ON B.BookingID=S.BookingID AND B.CompanyID=S.CompanyID
 INNER JOIN dbo.TDADMeetingRoom R ON R.RoomID=S.RoomID AND R.CompanyID=S.CompanyID
@@ -584,6 +601,9 @@ LEFT JOIN dbo.TDADUserEmployee RequesterUE
 LEFT JOIN dbo.TDADEmployee E
     ON E.EmployeeID=COALESCE(B.RequesterEmployeeID,RequesterUE.EmployeeID)
    AND E.CompanyID=B.CompanyID
+LEFT JOIN dbo.TDADOrganizationUnit D ON D.OrgUnitID=E.DepartmentOrgUnitID AND D.CompanyID=E.CompanyID AND D.UnitType='DEP'
+LEFT JOIN dbo.TDADMeetingDisplayVisibility V ON V.CompanyID=B.CompanyID
+OUTER APPLY (SELECT TOP (1) EmployeeNameDisplay FROM dbo.TDSTCompanySetUp WHERE CompanyID=B.CompanyID AND OwnerType='C' AND IsActive=1) CS
 WHERE S.CompanyID=@company
   AND (@calendarAll=1 OR CHARINDEX(','+CONVERT(varchar(20),R.RoomID)+',',@calendarAdmins)>0)
   AND S.StartDateTime<@finish AND S.EndDateTime>@start
@@ -596,6 +616,7 @@ ORDER BY S.StartDateTime,R.RoomCode,B.BookingID;
 """;
         await using var command = new SqlCommand(sql, connection);
         Add(command, "@company", companyId);
+        Add(command, "@user", userId);
         Add(command, "@start", start);
         Add(command, "@finish", finish);
         Add(command, "@branch", branchId);
@@ -610,12 +631,12 @@ ORDER BY S.StartDateTime,R.RoomCode,B.BookingID;
         while (await reader.ReadAsync(token)) items.Add(new
         {
             bookingSlotId = reader.GetInt64(0), bookingId = reader.GetInt64(1), bookingNo = Text(reader, 2),
-            subject = reader.GetString(3), description = Text(reader, 4), attendeeCount = reader.GetInt32(5),
+            subject = Text(reader, 3), description = Text(reader, 4), attendeeCount = reader.GetInt32(5),
             status = reader.GetString(6), approvalMode = reader.GetString(7), bookingDate = reader.GetDateTime(8),
             startDateTime = reader.GetDateTime(9), endDateTime = reader.GetDateTime(10),
             roomId = reader.GetInt64(11), roomCode = reader.GetString(12), roomNameTh = reader.GetString(13), capacity = Int(reader, 14),
             branchId = Long(reader, 15), branchName = Text(reader, 16), buildingId = Long(reader, 17), buildingName = Text(reader, 18),
-            floorId = Long(reader, 19), floorName = Text(reader, 20), requesterCode = Text(reader, 21), requesterName = Text(reader, 22),
+            floorId = Long(reader, 19), floorName = Text(reader, 20), requesterCode = Text(reader, 21), requesterName = Text(reader, 22), requesterDepartment = Text(reader, 23),
         });
         return Ok(new { items, from = start, to = finish.AddDays(-1) });
     }
@@ -1098,6 +1119,7 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
     {
         if(!TryCompany(out var company)||!await BookingAllowed(bookingId,"VIEW",token))return Forbid();
         await using var db=await Open(token);
+        if (!await EvaluationEnabled(db, token)) return Forbid();
         var activity=await Scalar(db,"SELECT ActivityTypeCode FROM dbo.TDADMeetingRoomBooking WHERE CompanyID=@company AND BookingID=@booking",token,("@company",(object?)company),("@booking",bookingId)) as string;
         if(activity is null)return NotFound();
         var sources=activity=="TRAINING"?"'MEETING_ROOM','TRAINING_COURSE','TRAINING_INSTRUCTOR'":"'MEETING_ROOM'";
@@ -1112,6 +1134,7 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
         var values=request.Items??[];var valid=new[]{"MEETING_ROOM","TRAINING_COURSE","TRAINING_INSTRUCTOR"};
         if(values.Any(x=>!valid.Contains(x.SourceType?.Trim().ToUpperInvariant())||x.TemplateId<=0)||values.Select(x=>x.SourceType.Trim().ToUpperInvariant()).Distinct().Count()!=values.Count)return BadRequest(Error("ข้อมูลแบบประเมินไม่ถูกต้อง","แต่ละประเภทเลือก Template ได้ไม่เกินหนึ่งรายการ"));
         await using var db=await Open(token);
+        if (!await EvaluationEnabled(db, token)) return Forbid();
         var activity=await Scalar(db,"SELECT B.ActivityTypeCode FROM dbo.TDADMeetingRoomBooking B WHERE B.CompanyID=@company AND B.BookingID=@booking AND B.BookingStatus IN('PENDING','APPROVED') AND EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBookingSlot S WHERE S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID AND S.StartDateTime>GETDATE())",token,("@company",(object?)company),("@booking",bookingId)) as string;
         if(activity is null)return Conflict(Error("แก้ไขการกำหนดแบบประเมินไม่ได้","รายการจองต้องยังไม่ถูกยกเลิก"));
         await using var tx=(SqlTransaction)await db.BeginTransactionAsync(token);

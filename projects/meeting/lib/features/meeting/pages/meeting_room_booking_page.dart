@@ -3829,7 +3829,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           ]
         : const <Widget>[];
     final canConfigureEvaluations =
-        !hasStarted && (status == 'PENDING' || status == 'APPROVED');
+        _actions['evaluationEnabled'] == true &&
+        !hasStarted &&
+        (status == 'PENDING' || status == 'APPROVED');
     final evaluationActions = canConfigureEvaluations
         ? <Widget>[
             IconButton(
@@ -4283,7 +4285,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final pending = value == 'PENDING';
     final negative = value == 'CANCELLED' || value == 'REJECTED';
     final label = switch (value) {
-      'APPROVED' => 'อนุมัติแล้ว',
+      'APPROVED' => 'อนุมัติ',
       'PENDING' => 'รออนุมัติ',
       'REJECTED' => 'ไม่อนุมัติ',
       'CANCELLED' => 'ยกเลิก',

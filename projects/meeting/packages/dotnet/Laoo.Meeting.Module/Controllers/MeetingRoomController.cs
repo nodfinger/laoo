@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Laoo.Shared.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -28,7 +29,7 @@ SELECT R.RoomID,R.BuildingID,R.FloorID,R.RoomCode,R.RoomNameTH,R.Capacity,
         FROM dbo.TDADMeetingRoomItem RI
         INNER JOIN dbo.TDIVItem I ON I.ItemID=RI.ItemID AND I.CompanyID=R.CompanyID
         WHERE RI.RoomID=R.RoomID
-        ORDER BY I.ItemCode FOR JSON PATH)
+        ORDER BY I.ItemCode FOR JSON PATH),R.HasRoomDisplay
 FROM dbo.TDADMeetingRoom R
 WHERE R.CompanyID=@company
 ORDER BY R.RoomCode
@@ -54,6 +55,7 @@ ORDER BY R.RoomCode
                 roomImageUrl = Text(reader, 7),
                 locationImageUrl = Text(reader, 8),
                 isActive = reader.GetBoolean(9),
+                hasRoomDisplay = reader.GetBoolean(11),
                 itemIds = items.Select(x => x.ItemId).ToList(),
                 itemItems = items,
             });
@@ -183,15 +185,15 @@ IF EXISTS(SELECT 1 FROM dbo.TDADMeetingRoom
 IF @id IS NULL
 BEGIN
     INSERT dbo.TDADMeetingRoom
-        (CompanyID,BuildingID,FloorID,RoomCode,RoomNameTH,Capacity,Description,IsActive)
-    VALUES (@company,@building,@floor,@code,@name,@capacity,@description,@active);
+        (CompanyID,BuildingID,FloorID,RoomCode,RoomNameTH,Capacity,Description,IsActive,HasRoomDisplay)
+    VALUES (@company,@building,@floor,@code,@name,@capacity,@description,@active,COALESCE(@display,0));
     SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
 END
 ELSE
 BEGIN
     UPDATE dbo.TDADMeetingRoom
     SET BuildingID=@building,FloorID=@floor,RoomCode=@code,RoomNameTH=@name,
-        Capacity=@capacity,Description=@description,IsActive=@active,
+        Capacity=@capacity,Description=@description,IsActive=@active,HasRoomDisplay=COALESCE(@display,HasRoomDisplay),
         UpdateDate=SYSUTCDATETIME()
     WHERE RoomID=@id AND CompanyID=@company;
     SELECT @id;
@@ -206,6 +208,7 @@ END
             Add(roomCommand, "@capacity", request.Capacity);
             Add(roomCommand, "@description", request.Description);
             Add(roomCommand, "@active", request.IsActive);
+            Add(roomCommand, "@display", request.HasRoomDisplay);
             var room = Convert.ToInt64(await roomCommand.ExecuteScalarAsync(token));
 
             await using var clear = new SqlCommand(
@@ -326,7 +329,8 @@ VALUES(@room,@item,@quantity,@remark,@isActive);
     }
 
     private Task<bool> Allowed(SqlConnection db, string action, CancellationToken token) =>
-        LaooMeetingApi.Security.MeetingFoodPlanAccess.Allowed(db, User, action, token, ScreenCode);
+        CompanyMenuAccess.IsAllowedForProjectAsync(
+            db, User, "LAOO_MEETING", ScreenCode, action, token);
 
     private async Task<SqlConnection> Open(CancellationToken token)
     {
@@ -360,7 +364,8 @@ public sealed record RoomRequest(
     int? Capacity,
     string? Description,
     List<RoomItem>? ItemItems,
-    bool IsActive = true);
+    bool IsActive = true,
+    bool? HasRoomDisplay = null);
 
 public sealed record RoomItem(
     long ItemId,

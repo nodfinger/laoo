@@ -2,6 +2,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
@@ -24,7 +26,7 @@ String _foodImageUrl(String value) {
 }
 
 Uint8List _compressFoodImage(Uint8List source) {
-  const maximumBytes = 70 * 1024;
+  const maximumBytes = 2 * 1024 * 1024;
   var decoded = img.decodeImage(source);
   if (decoded == null) {
     throw const FormatException('ไม่สามารถอ่านไฟล์รูปภาพได้');
@@ -48,7 +50,7 @@ Uint8List _compressFoodImage(Uint8List source) {
     final height = (working.height * .78).round().clamp(1, working.height - 1);
     working = img.copyResize(working, width: width, height: height);
   }
-  throw const FormatException('ไม่สามารถลดขนาดรูปให้ไม่เกิน 70 KB ได้');
+  throw const FormatException('ไม่สามารถลดขนาดรูปให้ไม่เกิน 2 MB ได้');
 }
 
 class MeetingFoodPage extends StatefulWidget {
@@ -150,7 +152,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
         return false;
       }
       if (term.isEmpty) return true;
-      return '${item['code']} ${item['nameTh']} ${item['foodTypeName'] ?? ''}'
+      return '${item['nameTh']} ${item['foodTypeName'] ?? ''}'
           .toLowerCase()
           .contains(term);
     }).toList();
@@ -253,7 +255,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   Widget _dataList(WorkspaceThemePreset preset) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardMode = _showCards || constraints.maxWidth < 900;
+        final cardMode = _showCards || constraints.maxWidth <= 600;
         if (cardMode) {
           return ListView.separated(
             itemCount: _visibleItems.length,
@@ -264,7 +266,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                 margin: EdgeInsets.zero,
                 child: ListTile(
                   leading: _foodImage(item, preset, size: 52),
-                  title: Text('${item['code']} | ${item['nameTh']}'),
+                  title: Text('${item['nameTh']}'),
                   subtitle: Text('ประเภท: ${item['foodTypeName'] ?? '-'}'),
                   trailing: _actionsFor(item, preset),
                 ),
@@ -277,6 +279,8 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
           child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(
+              horizontalMargin: 8,
+              columnSpacing: 20,
               headingRowColor: WidgetStatePropertyAll(
                 preset.primary.withValues(alpha: .10),
               ),
@@ -295,15 +299,16 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
               columns: const [
                 DataColumn(
                   columnWidth: LaooDataTable.idColumnWidth,
-                  numeric: true,
-                  label: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text('ID'),
-                  ),
+                  label: Text('ID'),
                 ),
-                DataColumn(label: Text('Action')),
-                DataColumn(label: Text('รูป')),
-                DataColumn(label: Text('รหัส')),
+                DataColumn(
+                  columnWidth: FixedColumnWidth(100),
+                  label: Text('Action'),
+                ),
+                DataColumn(
+                  columnWidth: FixedColumnWidth(60),
+                  label: Text('รูป'),
+                ),
                 DataColumn(label: Text('ชื่อรายการอาหาร')),
                 DataColumn(label: Text('ประเภทอาหาร')),
               ],
@@ -312,16 +317,10 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                 return DataRow(
                   cells: [
                     DataCell(
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          '${_currentPage * _pageSize + entry.key + 1}',
-                        ),
-                      ),
+                      Text('${_currentPage * _pageSize + entry.key + 1}'),
                     ),
                     DataCell(_actionsFor(item, preset)),
                     DataCell(_foodImage(item, preset, size: 44)),
-                    DataCell(Text('${item['code']}')),
                     DataCell(Text('${item['nameTh']}')),
                     DataCell(Text('${item['foodTypeName'] ?? '-'}')),
                   ],
@@ -348,16 +347,15 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   Future<void> _openForm({Map<String, dynamic>? item}) async {
     if (_actions[item == null ? 'create' : 'edit'] != true) return;
     final preset = workspaceThemeController.value;
-    final code = TextEditingController(text: item?['code'] as String? ?? '');
     final name = TextEditingController(text: item?['nameTh'] as String? ?? '');
     String? selectedType = item?['foodTypeCode'] as String?;
-    String? codeError;
     String? nameError;
     String? typeError;
     Uint8List? selectedImage;
     String? selectedImageName;
     String? imageError;
     var imageBusy = false;
+    var removeImage = false;
     final value = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -366,25 +364,13 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
             icon: Icons.restaurant_menu_outlined,
             text: '$_caption > ${item == null ? 'เพิ่ม' : 'แก้ไข'}',
           ),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
+          content: SizedBox(
+            width: 640,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextField(
-                    controller: code,
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (_) => refresh(() => codeError = null),
-                    style: const TextStyle(fontSize: LaooTypography.inputText),
-                    decoration: _inputDecoration(
-                      'รหัสอาหาร *',
-                      preset,
-                      errorText: codeError,
-                    ),
-                  ),
-                  const SizedBox(height: LaooLayout.popupFieldSpacing),
                   TextField(
                     controller: name,
                     onChanged: (_) => refresh(() => nameError = null),
@@ -396,39 +382,48 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                     ),
                   ),
                   const SizedBox(height: LaooLayout.popupFieldSpacing),
-                  DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    initialValue:
-                        _foodTypes.any((type) => type['code'] == selectedType)
-                        ? selectedType
-                        : null,
-                    style: TextStyle(
-                      color: preset.textPrimary,
-                      fontSize: LaooTypography.comboBox,
-                    ),
-                    decoration: _inputDecoration(
-                      'ประเภทอาหาร *',
-                      preset,
-                      errorText: typeError,
-                    ),
-                    items: _foodTypes
-                        .map(
-                          (type) => DropdownMenuItem<String>(
-                            value: '${type['code']}',
-                            child: Text(
-                              '${type['name']}',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: LaooTypography.comboBox,
-                              ),
-                            ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          initialValue:
+                              _foodTypes.any(
+                                (type) => type['code'] == selectedType,
+                              )
+                              ? selectedType
+                              : null,
+                          style: TextStyle(
+                            color: preset.textPrimary,
+                            fontSize: LaooTypography.comboBox,
                           ),
-                        )
-                        .toList(),
-                    onChanged: (value) => refresh(() {
-                      selectedType = value;
-                      typeError = null;
-                    }),
+                          decoration: _inputDecoration(
+                            'ประเภทอาหาร *',
+                            preset,
+                            errorText: typeError,
+                          ),
+                          items: _foodTypes
+                              .map(
+                                (type) => DropdownMenuItem<String>(
+                                  value: '${type['code']}',
+                                  child: Text(
+                                    '${type['name']}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: LaooTypography.comboBox,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) => refresh(() {
+                            selectedType = value;
+                            typeError = null;
+                          }),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: LaooLayout.popupFieldSpacing),
                   Text(
@@ -454,7 +449,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                             fit: BoxFit.cover,
                           ),
                         )
-                      else if (item != null)
+                      else if (item != null && !removeImage)
                         _foodImage(item, preset, size: 72)
                       else
                         Container(
@@ -500,6 +495,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                                   refresh(() {
                                     selectedImage = compressed;
                                     selectedImageName = 'food.jpg';
+                                    removeImage = false;
                                   });
                                 } catch (error) {
                                   if (!dialogContext.mounted) return;
@@ -523,11 +519,27 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                           imageBusy ? 'กำลังปรับรูป...' : 'เลือกรูปอาหาร',
                         ),
                       ),
+                      if (selectedImage != null ||
+                          (!removeImage &&
+                              (item?['imageUrl']?.toString().isNotEmpty ??
+                                  false)))
+                        OutlinedButton.icon(
+                          onPressed: imageBusy
+                              ? null
+                              : () => refresh(() {
+                                  selectedImage = null;
+                                  selectedImageName = null;
+                                  removeImage = true;
+                                  imageError = null;
+                                }),
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('ลบรูป'),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    imageError ?? 'ระบบจะปรับรูปเป็น JPG ขนาดไม่เกิน 70 KB',
+                    imageError ?? 'ระบบจะปรับรูปเป็น JPG ขนาดไม่เกิน 2 MB',
                     style: TextStyle(
                       color: imageError == null
                           ? preset.textSecondary
@@ -553,23 +565,17 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
               onPressed: imageBusy
                   ? null
                   : () {
-                      if (code.text.trim().isEmpty) {
-                        codeError = 'กรุณากรอกรหัสอาหาร';
-                      }
                       if (name.text.trim().isEmpty) {
                         nameError = 'กรุณากรอกชื่อรายการอาหาร';
                       }
                       if (selectedType == null) {
                         typeError = 'กรุณาเลือกประเภทอาหาร';
                       }
-                      if (codeError != null ||
-                          nameError != null ||
-                          typeError != null) {
+                      if (nameError != null || typeError != null) {
                         refresh(() {});
                         return;
                       }
                       Navigator.pop(dialogContext, {
-                        'code': code.text.trim(),
                         'nameTh': name.text.trim(),
                         'foodTypeCode': selectedType,
                       });
@@ -581,7 +587,6 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
         ),
       ),
     );
-    code.dispose();
     name.dispose();
     if (value == null) return;
     try {
@@ -595,6 +600,10 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
           selectedImage!,
           selectedImageName ?? 'food.jpg',
         );
+      } else if (removeImage &&
+          item != null &&
+          (item['imageUrl']?.toString().isNotEmpty ?? false)) {
+        await _repository.deleteImage(savedId);
       }
       if (!mounted) return;
       _showMessage('บันทึกรายการอาหารสำเร็จ');
@@ -611,7 +620,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => MeetingDeletePopup(
-        record: '${item['code']} | ${item['nameTh']}',
+        record: '${item['nameTh']}',
         description: 'ลบถาวรได้เฉพาะรายการที่ยังไม่ถูกใช้ในแผนหรือใบสั่งอาหาร',
       ),
     );
@@ -645,26 +654,58 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       title: _caption,
                       favoriteKey: '23004',
                       actions: [
-                        if (constraints.maxWidth >= 900)
-                          IconButton(
-                            tooltip: _showCards ? 'แสดง List' : 'แสดง Card',
-                            style: IconButton.styleFrom(
-                              foregroundColor: preset.primary,
-                              side: BorderSide(color: preset.primary),
-                            ),
-                            onPressed: () =>
-                                setState(() => _showCards = !_showCards),
-                            icon: Icon(
-                              _showCards
-                                  ? Icons.table_rows_outlined
-                                  : Icons.grid_view_outlined,
+                        if (constraints.maxWidth > 600)
+                          SizedBox.square(
+                            dimension: LaooTypography.buttonHeight,
+                            child: IconButton(
+                              tooltip: _showCards ? 'แสดง List' : 'แสดง Card',
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size.square(
+                                  LaooTypography.buttonHeight,
+                                ),
+                                padding: EdgeInsets.zero,
+                                foregroundColor: preset.primary,
+                                backgroundColor: preset.primary.withValues(
+                                  alpha: .10,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    LaooRadius.xs,
+                                  ),
+                                ),
+                              ),
+                              onPressed: () =>
+                                  setState(() => _showCards = !_showCards),
+                              icon: Icon(
+                                _showCards
+                                    ? Icons.table_rows_outlined
+                                    : Icons.grid_view_outlined,
+                                size: 24,
+                              ),
                             ),
                           ),
                         if (_actions['create'] == true)
-                          FilledButton.icon(
-                            onPressed: () => _openForm(),
-                            icon: const Icon(Icons.add),
-                            label: const Text('เพิ่ม'),
+                          SizedBox(
+                            height: LaooTypography.buttonHeight,
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(
+                                  0,
+                                  LaooTypography.buttonHeight,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    LaooRadius.xs,
+                                  ),
+                                ),
+                              ),
+                              onPressed: () => _openForm(),
+                              icon: const Icon(Icons.add),
+                              label: const Text('เพิ่ม'),
+                            ),
                           ),
                       ],
                     ),
@@ -673,87 +714,123 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                 const SizedBox(height: LaooLayout.listSectionSpacing),
                 WorkspaceSectionCard(
                   child: LayoutBuilder(
-                    builder: (context, constraints) => Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        SizedBox(
-                          width: constraints.maxWidth < 600
-                              ? constraints.maxWidth
-                              : 260,
-                          child: TextField(
-                            controller: _search,
-                            onSubmitted: (_) =>
-                                setState(() => _currentPage = 0),
-                            style: const TextStyle(
-                              fontSize: LaooTypography.inputText,
-                            ),
-                            decoration: _inputDecoration(
-                              'ค้นหารหัส ชื่อ หรือประเภท',
-                              preset,
-                            ).copyWith(prefixIcon: const Icon(Icons.search)),
-                          ),
-                        ),
-                        FilledButton.icon(
-                          onPressed: () => setState(() => _currentPage = 0),
-                          icon: const Icon(Icons.search),
-                          label: const Text('ค้นหา'),
-                        ),
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: preset.primary,
-                            side: BorderSide(color: preset.primary),
-                          ),
-                          onPressed: () {
-                            _search.clear();
-                            setState(() {
-                              _filterFoodTypeCode = null;
-                              _currentPage = 0;
-                            });
-                          },
-                          icon: const Icon(Icons.clear),
-                          label: const Text('ล้าง Filter'),
-                        ),
-                        SizedBox(
-                          width: constraints.maxWidth < 600
-                              ? constraints.maxWidth
-                              : 280,
-                          child: DropdownButtonFormField<String?>(
-                            isExpanded: true,
-                            initialValue: _filterFoodTypeCode,
-                            style: TextStyle(
-                              color: preset.textPrimary,
-                              fontSize: LaooTypography.comboBox,
-                            ),
-                            decoration: _inputDecoration('ประเภทอาหาร', preset),
-                            items: [
-                              const DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text('ทั้งหมด'),
+                    builder: (context, constraints) => FilterHeightSync(
+                      builder: (context, searchKey, height) => Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: constraints.maxWidth < 600
+                                ? constraints.maxWidth
+                                : 260,
+                            child: TextField(
+                              key: searchKey,
+                              controller: _search,
+                              onSubmitted: (_) =>
+                                  setState(() => _currentPage = 0),
+                              style: const TextStyle(
+                                fontSize: LaooTypography.inputText,
                               ),
-                              ..._foodTypes.map(
-                                (type) => DropdownMenuItem<String?>(
-                                  value: '${type['code']}',
-                                  child: Text(
-                                    '${type['name']}',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                              decoration: _inputDecoration(
+                                'ค้นหาชื่อหรือประเภท',
+                                preset,
+                              ).copyWith(prefixIcon: const Icon(Icons.search)),
+                            ),
+                          ),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              fixedSize: Size.fromHeight(height),
+                              visualDensity: VisualDensity.standard,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
                                 ),
                               ),
-                            ],
-                            onChanged: (value) => setState(() {
-                              _filterFoodTypeCode = value;
-                              _currentPage = 0;
-                            }),
+                            ).merge(filterActionHeightStyle(height)),
+                            onPressed: () => setState(() => _currentPage = 0),
+                            icon: const Icon(Icons.search),
+                            label: const Text('ค้นหา'),
                           ),
-                        ),
-                      ],
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              fixedSize: Size.fromHeight(height),
+                              visualDensity: VisualDensity.standard,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              foregroundColor: preset.primary,
+                              side: BorderSide(color: preset.primary),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
+                              ),
+                            ).merge(filterActionHeightStyle(height)),
+                            onPressed: () {
+                              _search.clear();
+                              setState(() {
+                                _filterFoodTypeCode = null;
+                                _currentPage = 0;
+                              });
+                            },
+                            icon: const Icon(Icons.clear),
+                            label: const Text('ล้าง Filter'),
+                          ),
+                          SizedBox(
+                            width: constraints.maxWidth < 600
+                                ? constraints.maxWidth
+                                : 280,
+                            child: DropdownButtonFormField<String?>(
+                              isExpanded: true,
+                              initialValue: _filterFoodTypeCode,
+                              style: TextStyle(
+                                color: preset.textPrimary,
+                                fontSize: LaooTypography.comboBox,
+                              ),
+                              decoration: _inputDecoration(
+                                'ประเภทอาหาร',
+                                preset,
+                              ),
+                              items: [
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('ทั้งหมด'),
+                                ),
+                                ..._foodTypes.map(
+                                  (type) => DropdownMenuItem<String?>(
+                                    value: '${type['code']}',
+                                    child: Text(
+                                      '${type['name']}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (value) => setState(() {
+                                _filterFoodTypeCode = value;
+                                _currentPage = 0;
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: LaooLayout.listSectionSpacing),
                 if (_loading) const LinearProgressIndicator(),
-                Expanded(child: WorkspaceSectionCard(child: _dataList(preset))),
+                Expanded(
+                  child: WorkspaceSectionCard(
+                    padding: const EdgeInsets.all(10),
+                    child: _dataList(preset),
+                  ),
+                ),
                 const SizedBox(height: LaooLayout.listSectionSpacing),
                 _pagination(preset),
               ],

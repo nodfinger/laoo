@@ -26,8 +26,11 @@ public sealed class MeetingEquipmentRequestController(IConfiguration configurati
     {
         if (!Scope(out var company, out var user)) return Forbid();
         await using var db = await Open(token);
-        if (!await CompanyAdmin(db, company, user, token)) return Forbid();
-        return Ok(new { requireEquipmentRequestReview = await RequiresReview(db, company, token) });
+        if (!await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedForProjectAsync(db, User, "LAOO_MEETING", "22006", "VIEW", token)) return Forbid();
+        return Ok(new {
+            requireEquipmentRequestReview = await RequiresReview(db, company, token),
+            canEdit = await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedForProjectAsync(db, User, "LAOO_MEETING", "22006", "EDIT", token),
+        });
     }
 
     [HttpPut("settings")]
@@ -35,7 +38,7 @@ public sealed class MeetingEquipmentRequestController(IConfiguration configurati
     {
         if (!Scope(out var company, out var user)) return Forbid();
         await using var db = await Open(token);
-        if (!await CompanyAdmin(db, company, user, token)) return Forbid();
+        if (!await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedForProjectAsync(db, User, "LAOO_MEETING", "22006", "EDIT", token)) return Forbid();
         const string sql = """
 IF EXISTS(SELECT 1 FROM dbo.TDSTCompanySetupSystemMeeting WHERE CompanyID=@company AND ProjectID=@project)
  UPDATE dbo.TDSTCompanySetupSystemMeeting SET RequireEquipmentRequestReview=@review,UpdateBy=@user,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company AND ProjectID=@project;
